@@ -2,11 +2,12 @@ library(dplyr)
 library(stringr)
 
 # Setting up the environment and calling files
-wf <- function (x) paste('/Users/kelseebratley/Documents/Condition Monitoring/Matching/', x, sep='')
+wf <- function (x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/Data/', x, sep='')
 
 # List of file names
-files <- c(wf("data/2016_covariates.csv"), wf("data/2017_covariates.csv"), wf("data/2018_covariates.csv"), 
-           wf("data/2019_covariates.csv"), wf("data/2021_covariates.csv"), wf("data/2022_covariates.csv"))
+files <- c(wf("2016_covariates.csv"), wf("2017_covariates.csv"), wf("2018_covariates.csv"), 
+           wf("2019_covariates.csv"), wf("2021_covariates.csv"), wf("2022_covariates.csv"))
+
 
 # Initialize an empty data frame to store the combined data
 combined_data <- data.frame()
@@ -70,22 +71,14 @@ combined_data <- combined_data %>%
     ifelse(Year %in% c(2022, 2017, 2016), 0, treated)
   ))
 
-# # Organize data match question formats:
-
+# Organize data match question formats:
 # Treated in the current year and previous year 
 combined_data$treated_2yrs_consecutively <- ifelse(combined_data$treated == 1 & combined_data$treated_Prev1Y == 1, 1, 0)
 
 # Treated in previous year but not current
 combined_data$treated_1yrPrior_notFollowingYr <- ifelse(combined_data$treated == 0 & combined_data$treated_Prev1Y == 1, 1, 0)
 
-
-# # Treated 2 years prior, but not in following years
-# combined_data$treated_2yrsPrior_notFollowingYrs <- ifelse(combined_data$treated == 0 & combined_data$treated_Prev1Y == 0 & combined_data$treated_Prev2Y == 1, 1,
-#                            ifelse(combined_data$treated == 1 & combined_data$treated_Prev1Y == 1 & combined_data$treated_Prev2Y == 0, 0, NA))
-
-# # Calculate the percent change of Greenness 
-# combined_data$greennessChange <- ((combined_data$preSprayGreenness - combined_data$postSprayGreenness) / combined_data$preSprayGreenness) * 100
-
+# Rename greenness impact variable
 colnames(combined_data)[colnames(combined_data) == "greennessImpact"] <- "greennessChange"
 
 # Organize the column order
@@ -95,7 +88,7 @@ Panel <- combined_data[, c('Pixel_ID', 'Year', 'greennessChange',
 
 write.csv(Panel, "Panel", row.names = FALSE)
 
-# Count the occurrences of each year in the 'Year' column
+# Count the occurrences of each year in the 'Year' column - make sure they all match
 year_counts <- table(combined_data$Year)
 
 # Print the results
