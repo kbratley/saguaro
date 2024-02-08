@@ -18,17 +18,6 @@ ols <- lm(greennessImpact ~ treated + treated_2yrs_consecutively + treated_prev1
 stargazer(ols, type="text")
 #summary(ols)
 
-
-# # Visualize the residuals
-# ggplot(ols, aes(x = fitted(ols), y = residuals(ols))) +
-#   geom_point() +
-#   geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-#   labs(title = "Residual Plot",
-#        x = "Fitted Values",
-#        y = "Residuals") +
-#   theme_minimal()
-
-
 # Assess whether boom-spray treatment is effective in reducing greenness for individual years
 
 # Fit the linear regression model with interactions
@@ -51,31 +40,6 @@ random <- plm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treate
                 aspect_transform + elevation + slope + preSprayGreenness, data = Panel, index=c("Pixel_ID", "Year"), model="random")
 stargazer(pooled, fixed, random, column.labels = c("Pooled", "Fixed", "Random"), type = "text")
 stargazer(fixed, column.labels = c("Fixed"), type = "text")
-
-
-# # greenness change as a percent
-# pooled <- plm(greennessChange ~ treated + treated_Prev1Y  + treated_Prev2Y  +
-#                 aspect_transform + elevation + slope + preSprayGreenness, data = Panel, model="pooling")
-# fixed <- plm(greennessChange ~ treated + treated_Prev1Y + treated_Prev2Y + 
-#                aspect_transform + elevation + slope + preSprayGreenness, data=Panel, index=c("Pixel_ID", "Year"), model="within")
-# random <- plm(greennessChange ~ treated + treated_Prev1Y + treated_Prev2Y + 
-#                 aspect_transform + elevation + slope + preSprayGreenness, data=Panel, index=c("Pixel_ID", "Year"), model="random")
-# stargazer(pooled, fixed, random, column.labels = c("Pooled", "Fixed", "Random"), type = "text")
-
-
-# # greenness change as a percent - ln data transform
-# Panel <- Panel %>% 
-#   mutate(lnPreSprayGreenness = log(preSprayGreenness)) %>% 
-#   mutate(lnGreennessChange = log(greennessImpact))
-# 
-# pooled <- plm(lnGreennessChange ~ treated + treated_Prev1Y  + treated_Prev2Y  +
-#                 aspect_transform + elevation + slope + lnPreSprayGreenness, data = Panel, model="pooling")
-# fixed <- plm(lnGreennessChange ~ treated + treated_Prev1Y + treated_Prev2Y + 
-#                aspect_transform + elevation + slope + lnPreSprayGreenness, data=Panel, index=c("Pixel_ID", "Year"), model="within")
-# random <- plm(lnGreennessChange ~ treated + treated_Prev1Y + treated_Prev2Y + 
-#                 aspect_transform + elevation + slope + lnPreSprayGreenness, data=Panel, index=c("Pixel_ID", "Year"), model="random")
-# stargazer(pooled, fixed, random, column.labels = c("Pooled", "Fixed", "Random"), type = "text")
-
 
 # Lagrange Multiplier Test - run to determine whether random effects or pooled model is better
 plmtest(pooled)
