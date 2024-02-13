@@ -12,6 +12,7 @@ wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main
 files <- c("Data/2016_variables.csv", "Data/2017_variables.csv", "Data/2018_variables.csv", 
            "Data/2019_variables.csv", "Data/2021_variables.csv", "Data/2022_variables.csv")
 
+## PART 1 ##
 # Loop over files to run matching for each dataset
 for (file in files) {
   # Load data
@@ -65,15 +66,8 @@ for (file in files) {
   assign(paste0("dataset_", year_label), d.m)
 }
 
-
-
-
-
-
-
-
-# Create mask of aggregate matched results
-# List of dataset variables
+## PART 2 ##
+# Aggregate matched results to serve as a 'mask' for filtering panel model data
 dataset_variables <- c("treated", "group", "latitude", "longitude", ".geo")
 
 # Initialize the final combined dataset
@@ -106,8 +100,12 @@ final_dataset <- final_dataset %>%
 # Print the final combined dataset
 head(final_dataset)
 
-# Save the final combined dataset
+# Save the final combined dataset as CSV
 write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE)
+
+# Save the final combined dataset as shapefile
+export_file_name <- paste0("Results/final_combined_dataset.shp")
+st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
 
 # plot
 plot_matched_units <- function(dataset, year) {
@@ -119,7 +117,6 @@ plot_matched_units <- function(dataset, year) {
     theme(legend.title = element_text(size = 16))
 }
 
-# Example usage:
 plot_matched_units(dataset_2016, "2016")
 plot_matched_units(dataset_2017, "2017")
 plot_matched_units(dataset_2018, "2018")
