@@ -96,10 +96,10 @@ combined_data <- combined_data %>%
 # combined_data$treated_1yrPrior_notFollowingYr <- ifelse(combined_data$treated == 0 & combined_data$treated_Prev1Y == 1, 1, 0)
 
 # Organize the column order
-Panel <- combined_data[, c("Pixel_ID", "Year", "greennessChange",
+panel_data <- combined_data[, c("Pixel_ID", "Year", "greennessChange",
                            "treated", #"treated_1yrPrior_notFollowingYr", "treated_2yrs_consecutively",
                            "aspect_transform", "elevation", "slope", 
                            "preSprayGreenness", "postSprayGreenness", 
-                           "group", "latitude", "longitude", "geometry")]
+                           "latitude", "longitude")]
 
-write.csv(Panel, "Results/Panel", row.names = FALSE)
+write.csv(panel_data, "Results/panel_data.csv", row.names = FALSE)
