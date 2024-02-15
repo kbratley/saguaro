@@ -1,4 +1,4 @@
-# BE SURE TO RUN 'Organize_PanelData.R' FIRST
+# *** Make sure your environment is cleared *** #
 
 library(foreign)
 library(gplots)
@@ -8,24 +8,17 @@ library(plm)
 library(dplyr)
 library(magrittr)
 
-# Remove NA's 
-Panel[is.na(Panel)] <- 0
+
+# Setting up the environment and calling files
+wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/', x, sep='')
+panel_data <- read.csv(wf("Results/panel_data.csv"), row.names = NULL)
 
 # plotmeans( greennessImpact ~ Year, main="Heterogeneity across years", data=Panel)
 
 ols <- lm(greennessImpact ~ treated + treated_2yrs_consecutively + treated_prev1Yr_notCurrentYr + treated_2yrsPrior_notFollowingYrs +
-            aspect_transform + elevation + slope + preSprayGreenness, data = Panel)
+            aspect_transform + elevation + slope + preSprayGreenness, data = panel_data)
 stargazer(ols, type="text")
 #summary(ols)
-
-# Assess whether boom-spray treatment is effective in reducing greenness for individual years
-
-# Fit the linear regression model with interactions
-# ols <- lm(greennessImpact ~ treated_Prev1Y * as.factor(Year) + treated_Prev2Y * as.factor(Year) + 
-# ols <- lm(greennessImpact ~ treated_Prev1Y +# treated_Prev2Y +
-#             aspect_transform + elevation + slope + preSprayGreenness, data = Panel)
-# stargazer(ols, type="text")
-# summary(ols)
 
 
 # Typical "workflow" of panel modeling, is to FIRST - estimate the pooled, random effects, and fixed effects models, 
@@ -33,11 +26,11 @@ stargazer(ols, type="text")
 
 # greennessImpact is direct difference of greenness
 pooled <- plm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-                aspect_transform + elevation + slope + preSprayGreenness, data = Panel, model="pooling")
+                aspect_transform + elevation + slope + preSprayGreenness, data = panel_data, model="pooling")
 fixed <- plm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-               aspect_transform + elevation + slope + preSprayGreenness, data = Panel, index=c("Pixel_ID", "Year"), model="within")
+               aspect_transform + elevation + slope + preSprayGreenness, data = panel_data, index=c("Pixel_ID", "Year"), model="within")
 random <- plm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-                aspect_transform + elevation + slope + preSprayGreenness, data = Panel, index=c("Pixel_ID", "Year"), model="random")
+                aspect_transform + elevation + slope + preSprayGreenness, data = panel_data, index=c("Pixel_ID", "Year"), model="random")
 stargazer(pooled, fixed, random, column.labels = c("Pooled", "Fixed", "Random"), type = "text")
 stargazer(fixed, column.labels = c("Fixed"), type = "text")
 
@@ -53,35 +46,35 @@ phtest(fixed, random)
 #The null hypothesis is that random effects is preferred to the fixed effects model. 
 # our p.val is actually less than 0.5, so we reject the null and conclude that the fixed effects model is actually preferred to the random
 
-# Look at regressions for each year individually
-reg_2016 <-Panel %>% 
-  filter(Year == 2016) %>% 
-  lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-       aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
-
-reg_2017 <-Panel %>% 
-  filter(Year == 2017) %>% 
-  lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-       aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
-  
-reg_2018 <-Panel %>% 
-  filter(Year == 2018) %>% 
-  lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-       aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
-  
-reg_2019 <-Panel %>% 
-  filter(Year == 2019) %>% 
-  lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-       aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
-
-reg_2021 <-Panel %>% 
-  filter(Year == 2021) %>% 
-  lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-       aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
-  
-reg_2022 <-Panel %>% 
-  filter(Year == 2022) %>% 
-  lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
-       aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
-
-stargazer(reg_2016, reg_2017, reg_2018, reg_2019, reg_2021, reg_2022, column.labels = c("2016","2017","2018","2019","2021","2022"), title="Yearly OLS", align=TRUE, type = "text")
+# # Look at regressions for each year individually
+# reg_2016 <-Panel %>% 
+#   filter(Year == 2016) %>% 
+#   lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
+#        aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
+# 
+# reg_2017 <-Panel %>% 
+#   filter(Year == 2017) %>% 
+#   lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
+#        aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
+#   
+# reg_2018 <-Panel %>% 
+#   filter(Year == 2018) %>% 
+#   lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
+#        aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
+#   
+# reg_2019 <-Panel %>% 
+#   filter(Year == 2019) %>% 
+#   lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
+#        aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
+# 
+# reg_2021 <-Panel %>% 
+#   filter(Year == 2021) %>% 
+#   lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
+#        aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
+#   
+# reg_2022 <-Panel %>% 
+#   filter(Year == 2022) %>% 
+#   lm(postSprayGreenness ~ treated + treated_2yrs_consecutively + treated_1yrPrior_notFollowingYr + 
+#        aspect_transform + elevation + slope + preSprayGreenness, data=., column.labels=c("Pixel_ID", "Year"))
+# 
+# stargazer(reg_2016, reg_2017, reg_2018, reg_2019, reg_2021, reg_2022, column.labels = c("2016","2017","2018","2019","2021","2022"), title="Yearly OLS", align=TRUE, type = "text")

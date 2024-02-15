@@ -4,7 +4,6 @@ library(Matching)
 library(dplyr)
 library(sf)
 
-
 # Setting up the environment and calling files
 wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/', x, sep='')
 
@@ -101,11 +100,11 @@ final_dataset <- final_dataset %>%
 head(final_dataset)
 
 # Save the final combined dataset as CSV
-write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE)
+# write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE)
 
 # Save the final combined dataset as shapefile
-export_file_name <- paste0("Results/final_combined_dataset.shp")
-st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
+# export_file_name <- paste0("Results/final_combined_dataset.shp")
+# st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
 
 # plot
 plot_matched_units <- function(dataset, year) {

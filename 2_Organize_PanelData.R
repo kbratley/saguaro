@@ -64,42 +64,56 @@ pixels_to_remove <- pixel_counts %>%
 combined_data <- combined_data %>%
   filter(!(Pixel_ID %in% pixels_to_remove))
 
-# Function to create new columns for sine and cosine of aspect with a 45-degree shift
+# Function to create new columns for cosine of aspect with a 45-degree shift
 transform_aspect <- function(data, aspect_col_name) {
   data %>%
-    mutate(eastness = sin((!!sym(aspect_col_name)-45)),
-           aspect_transform = cos((!!sym(aspect_col_name)-45)))
+    mutate(aspect_transform = cos((!!sym(aspect_col_name)-45)))
 }
 combined_data <- transform_aspect(combined_data, "aspect")
 
-# Add a new column that indicates whether each data point was sprayed in the previous year
-combined_data <- combined_data %>%
-  group_by(Pixel_ID) %>%
-  mutate(treated_Prev1Y = ifelse(
-    Year %in% c(2022, 2019, 2018, 2017), lag(treated),
-    ifelse(Year %in% c(2021, 2016), 0, treated)
-  ))
-
-# Add a new column that indicates whether each data point was sprayed two years prior
-combined_data <- combined_data %>%
-  group_by(Pixel_ID) %>%
-  mutate(treated_Prev2Y = ifelse(
-    Year %in% c(2021, 2019, 2018), lag(treated, n=2),
-    ifelse(Year %in% c(2022, 2017, 2016), 0, treated)
-  ))
-
-# # Organize data match question formats:
-# # Treated in the current year and previous year 
-# combined_data$treated_2yrs_consecutively <- ifelse(combined_data$treated == 1 & combined_data$treated_Prev1Y == 1, 1, 0)
+# # Add a new column that indicates whether each data point was sprayed in the previous year
+# combined_data <- combined_data %>%
+#   group_by(Pixel_ID) %>%
+#   mutate(treated_Prev1Y = ifelse(
+#     Year %in% c(2022, 2019, 2018, 2017), lag(treated),
+#     ifelse(Year %in% c(2021, 2016), 0, treated)
+#   ))
 # 
-# # Treated in previous year but not current
-# combined_data$treated_1yrPrior_notFollowingYr <- ifelse(combined_data$treated == 0 & combined_data$treated_Prev1Y == 1, 1, 0)
+# # Add a new column that indicates whether each data point was sprayed two years prior
+# combined_data <- combined_data %>%
+#   group_by(Pixel_ID) %>%
+#   mutate(treated_Prev2Y = ifelse(
+#     Year %in% c(2021, 2019, 2018), lag(treated, n=2),
+#     ifelse(Year %in% c(2022, 2017, 2016), 0, treated)
+#   ))
+
+# new dataframe to prevent errors
+
+panel_data <- combined_data
+
+panel_data <- panel_data %>%
+    pivot_longer(cols = starts_with("preSprayGreenness") | starts_with("postSprayGreenness"),
+               names_to = "post_treatment", values_to = "greenness") %>%
+  mutate(post_treatment = ifelse(grepl("preSpray", post_treatment), "0", "1"),
+         ATT = as.numeric(treated) * as.numeric(post_treatment))
+
+# Create 'Year' dummies and add them to 'combined_data'
+year_dummies <- model.matrix(~as.factor(panel_data$Year) - 1)
+colnames(year_dummies) <- paste("year", colnames(year_dummies), sep="_")
+panel_data <- cbind(panel_data, year_dummies)
+
+# Modify factor variable names
+factor_column_names <- colnames(panel_data)[grepl("^year_as.factor", colnames(panel_data))]
+new_factor_names <- gsub("year_as\\.factor\\(([^)]+)\\)", "\\1", factor_column_names)
+colnames(panel_data)[grepl("^year_as.factor", colnames(panel_data))] <- new_factor_names
 
 # Organize the column order
-panel_data <- combined_data[, c("Pixel_ID", "Year", "greennessChange",
-                           "treated", #"treated_1yrPrior_notFollowingYr", "treated_2yrs_consecutively",
+panel_data <- panel_data[, c("Pixel_ID", "Year", 
+                           "greenness", "greennessChange",
+                           "treated", "post_treatment", "ATT",
+                           "panel_data$Year2016", "panel_data$Year2017", "panel_data$Year2018","panel_data$Year2019","panel_data$Year2021","panel_data$Year2022",
+                           # "treated_buffer", "annual_rainfall",
                            "aspect_transform", "elevation", "slope", 
-                           "preSprayGreenness", "postSprayGreenness", 
                            "latitude", "longitude")]
 
 write.csv(panel_data, "Results/panel_data.csv", row.names = FALSE)
