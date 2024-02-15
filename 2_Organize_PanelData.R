@@ -1,5 +1,3 @@
-# *** Make sure your environment is cleared *** #
-
 library(dplyr)
 library(stringr)
 library(sf)

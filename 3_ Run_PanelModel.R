@@ -1,5 +1,3 @@
-# *** Make sure your environment is cleared *** #
-
 library(foreign)
 library(gplots)
 library(ggplot2)
