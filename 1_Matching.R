@@ -4,36 +4,64 @@ library(Matching)
 library(dplyr)
 library(sf)
 
-# Setting up the environment and calling files
-wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/', x, sep='')
+# # Setting up the environment and calling files
+# wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/', x, sep='')
+# 
+# # List of file names
+# files <- c("Data/wBuffer/2016_variables.shp", "Data/wBuffer/2017_variables.shp", "Data/wBuffer/2018_variables.shp", 
+#            "Data/wBuffer/2019_variables.shp", "Data/wBuffer/2021_variables.shp", "Data/wBuffer/2022_variables.shp")
+# 
+# ## PART 1 ##
+# # Loop over files to run matching for each dataset
+# for (file in files) {
+#   # Load data
+#   file_url <- wf(file)
+#   d <- st_read(file_url)
+# }
+
+
+# Set the local path to your folder
+local_folder <- "/users/kelseebratley/saguaro/Data/wBuffer"
 
 # List of file names
-files <- c("Data/2016_variables.csv", "Data/2017_variables.csv", "Data/2018_variables.csv", 
-           "Data/2019_variables.csv", "Data/2021_variables.csv", "Data/2022_variables.csv")
+files <- c("2016_variables.shp", "2017_variables.shp", "2018_variables.shp", 
+           "2019_variables.shp", "2021_variables.shp", "2022_variables.shp")
 
 ## PART 1 ##
 # Loop over files to run matching for each dataset
 for (file in files) {
+  # Construct the local file path
+  file_path <- file.path(local_folder, file)
   # Load data
-  file_url <- wf(file)
-  d <- read.csv(file_url)
+  d <- st_read(file_path)
   
-  # Function to create new column for cosine of aspect with a 45-degree shift
+  # Function to create a new column for cosine of aspect with a 45-degree shift
   transform_aspect <- function(data, aspect_col_name) {
     data %>%
       mutate(aspect_transform = cos((!!sym(aspect_col_name)-45)))
   }
   
-  # Apply the function to the combined data frame
+  # Apply the function to the loaded dataset
   d <- transform_aspect(d, "aspect")
   
-  head(d)
   # Visualizing treated vs. untreated
-  d$cat <- ifelse(d$treated==0, 'untreated', 
+  d$cat <- ifelse(d$treated==0, 'untreated',
                   ifelse(d$treated==1, 'treated', NA))
+
   # boolean indexing:
-  d <- d[!is.na(d$cat),]
-  table(d$cat)  # counts pixels for each group
+  # d <- d[!is.na(d$cat),]
+  # table(d$cat)  # counts pixels for each group
+  na_indices <- is.na(d$cat)
+  
+  # Subset the data frame only if there are no NA values
+  if (any(na_indices)) {
+    d <- d[!na_indices,]
+  }
+  
+  # Verify that 'cat' column is still present and correct
+  print("Before matching:")
+  print(colnames(d))
+  print(str(d))
   
   # Matching
   d.tr <- d[d$cat=='treated',]
@@ -41,18 +69,26 @@ for (file in files) {
   d.tr$tr <- 1
   d.ct$tr <- 0
   d.in <- rbind(d.tr, d.ct)
+  # Remove the geometry column
+  d.in <- sf::st_set_geometry(d.in, NULL)
   
-  # Running Match
-  cov <- c('elevation','slope','aspect', 'preSprayGreenness')
-  m <- Match(d.in$greennessDiff, d.in$tr, d.in[,cov], caliper=0.5)
-  
+  cov <- c('elevation','slope','aspect_transform')
+  m <- Match(d.in$preSprayGr, d.in$tr, d.in[,cov], caliper=0.5)
+
+  # Print summary of the matching
+  print(summary(m))
+
   # Retrieving matched dataset
   d.m <- rbind(d.in[m$index.treated,],d.in[m$index.control,])
-  
+
+  # Print structure of d.m
+  print("Structure of d.m after matching:")
+  print(str(d.m))
+
   # Creating a new categorical treatment variable for mapping
   d.m$group <- ifelse(d.m$tr, 'treatment units', 'matched controls')
   print(summary(m))
-  
+
   # Exporting 'm' variable for each year
   if (!file.exists("Results")) {
     dir.create("Results")
@@ -60,7 +96,7 @@ for (file in files) {
   year_label <- str_extract(file, "\\d{4}")
   export_file_name <- paste0("Results/matching_results_", year_label, ".shp")
   st_write(st_as_sf(d.m, coords = c("longitude", "latitude")), export_file_name)
-  
+
   # Exporting dataset to environment
   assign(paste0("dataset_", year_label), d.m)
 }
@@ -76,10 +112,10 @@ final_dataset <- NULL
 for (year_label in c("2016", "2017", "2018", "2019", "2021", "2022")) {
   # Load each dataset from the environment
   dataset <- get(paste0("dataset_", year_label))
-  
+
   # Select the relevant columns
   dataset <- dataset[, dataset_variables, drop = FALSE]
-  
+
   # Combine datasets
   if (is.null(final_dataset)) {
     final_dataset <- dataset
@@ -100,11 +136,11 @@ final_dataset <- final_dataset %>%
 head(final_dataset)
 
 # Save the final combined dataset as CSV
-# write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE)
+write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE)
 
 # Save the final combined dataset as shapefile
-# export_file_name <- paste0("Results/final_combined_dataset.shp")
-# st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
+export_file_name <- paste0("Results/final_combined_dataset.shp")
+st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
 
 # plot
 plot_matched_units <- function(dataset, year) {
