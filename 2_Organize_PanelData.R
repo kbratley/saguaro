@@ -62,13 +62,6 @@ pixels_to_remove <- pixel_counts %>%
 combined_data <- combined_data %>%
   filter(!(Pixel_ID %in% pixels_to_remove))
 
-# Function to create new columns for cosine of aspect with a 45-degree shift
-transform_aspect <- function(data, aspect_col_name) {
-  data %>%
-    mutate(aspect_transform = cos((!!sym(aspect_col_name)-45)))
-}
-combined_data <- transform_aspect(combined_data, "aspect")
-
 # # Add a new column that indicates whether each data point was sprayed in the previous year
 # combined_data <- combined_data %>%
 #   group_by(Pixel_ID) %>%
