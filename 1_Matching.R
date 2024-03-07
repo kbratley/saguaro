@@ -19,9 +19,11 @@ library(sf)
 #   d <- st_read(file_url)
 # }
 
+# Initialize an empty list to store matching summaries
+matching_summaries <- list()
 
 # Set the local path to your folder
-local_folder <- "/users/kelseebratley/saguaro/Data/wBuffer"
+local_folder <- "/users/kelseebratley/saguaro/Data/wPreviousTreatedANDBufferRemoved/"
 
 # List of file names
 files <- c("2016_variables.shp", "2017_variables.shp", "2018_variables.shp", 
@@ -35,15 +37,6 @@ for (file in files) {
   # Load data
   d <- st_read(file_path)
   
-  # Function to create a new column for cosine of aspect with a 45-degree shift
-  transform_aspect <- function(data, aspect_col_name) {
-    data %>%
-      mutate(aspect_transform = cos((!!sym(aspect_col_name)-45)))
-  }
-  
-  # Apply the function to the loaded dataset
-  d <- transform_aspect(d, "aspect")
-  
   # Visualizing treated vs. untreated
   d$cat <- ifelse(d$treated==0, 'untreated',
                   ifelse(d$treated==1, 'treated', NA))
@@ -52,17 +45,12 @@ for (file in files) {
   # d <- d[!is.na(d$cat),]
   # table(d$cat)  # counts pixels for each group
   na_indices <- is.na(d$cat)
-  
+
   # Subset the data frame only if there are no NA values
   if (any(na_indices)) {
     d <- d[!na_indices,]
   }
-  
-  # Verify that 'cat' column is still present and correct
-  print("Before matching:")
-  print(colnames(d))
-  print(str(d))
-  
+
   # Matching
   d.tr <- d[d$cat=='treated',]
   d.ct <- d[d$cat=='untreated',]
@@ -71,23 +59,22 @@ for (file in files) {
   d.in <- rbind(d.tr, d.ct)
   # Remove the geometry column
   d.in <- sf::st_set_geometry(d.in, NULL)
-  
-  cov <- c('elevation','slope','aspect_transform')
-  m <- Match(d.in$preSprayGr, d.in$tr, d.in[,cov], caliper=0.5)
+
+  cov <- c('elevation','slope','aspect')
+  m <- Match(d.in$preSprayGr, d.in$tr, d.in[,cov], caliper=0.5, replace = FALSE)
 
   # Print summary of the matching
-  print(summary(m))
-
+  matching_summary <- summary(m)
+  print(matching_summary)
+  
+  # Add the matching summary to the list
+  matching_summaries[[file]] <- matching_summary
+  
   # Retrieving matched dataset
   d.m <- rbind(d.in[m$index.treated,],d.in[m$index.control,])
 
-  # Print structure of d.m
-  print("Structure of d.m after matching:")
-  print(str(d.m))
-
   # Creating a new categorical treatment variable for mapping
   d.m$group <- ifelse(d.m$tr, 'treatment units', 'matched controls')
-  print(summary(m))
 
   # Exporting 'm' variable for each year
   if (!file.exists("Results")) {
@@ -142,14 +129,25 @@ write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE
 export_file_name <- paste0("Results/final_combined_dataset.shp")
 st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
 
-# plot
+# Function to save and plot matched units
 plot_matched_units <- function(dataset, year) {
-  ggplot(dataset) +
+  # Plot
+  plot <- ggplot(dataset) +
     geom_point(aes(x = longitude, y = latitude, color = group), alpha = 0.5, size = 0.25) +
     coord_fixed() +
     ggtitle(paste(year, "- Matched vs. Treatment Units")) +
     theme(legend.text = element_text(size = 16)) +
     theme(legend.title = element_text(size = 16))
+  
+  # Save plot
+  plot_file_name <- paste0("Results/matched_plots/", year, "_matched_units_plot.png")
+  ggsave(plot_file_name, plot, width = 8, height = 6, units = "in", dpi = 300)
+
+  # Print the saved file name
+  print(paste("Saved plot:", plot_file_name))
+  
+  # Return the plot (optional)
+  return(plot)
 }
 
 plot_matched_units(dataset_2016, "2016")
