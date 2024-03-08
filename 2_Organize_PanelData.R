@@ -99,12 +99,10 @@ new_factor_names <- gsub("year_as\\.factor\\(([^)]+)\\)", "\\1", factor_column_n
 colnames(panel_data)[grepl("^year_as.factor", colnames(panel_data))] <- new_factor_names
 
 # Organize the column order
-panel_data <- panel_data[, c("Pixel_ID", "Year", 
-                           "greenness", "greennessChange",
+panel_data <- panel_data[, c("Pixel_ID", "Year", "greenness",
                            "treated", "post_treatment", "ATT",
                            "panel_data$Year2016", "panel_data$Year2017", "panel_data$Year2018","panel_data$Year2019","panel_data$Year2021","panel_data$Year2022",
-                           # "treated_buffer", "annual_rainfall",
-                           "aspect_transform", "elevation", "slope", 
+                           "precipitation_sum", "aspect", "elevation", "slope", 
                            "latitude", "longitude")]
 
 write.csv(panel_data, "Results/panel_data.csv", row.names = FALSE)

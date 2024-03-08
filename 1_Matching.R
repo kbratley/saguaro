@@ -8,9 +8,9 @@ library(sf)
 # wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/', x, sep='')
 # 
 # # List of file names
-# files <- c("Data/wBuffer/2016_variables.shp", "Data/wBuffer/2017_variables.shp", "Data/wBuffer/2018_variables.shp", 
-#            "Data/wBuffer/2019_variables.shp", "Data/wBuffer/2021_variables.shp", "Data/wBuffer/2022_variables.shp")
-# 
+# files <- c("Data/wPreviousTreatedANDBufferRemoved/2016_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2017_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2018_variables.shp",
+#            "Data/wPreviousTreatedANDBufferRemoved/2019_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2021_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2022_variables.shp")
+
 # ## PART 1 ##
 # # Loop over files to run matching for each dataset
 # for (file in files) {
@@ -19,15 +19,12 @@ library(sf)
 #   d <- st_read(file_url)
 # }
 
-# Initialize an empty list to store matching summaries
-matching_summaries <- list()
 
 # Set the local path to your folder
 local_folder <- "/users/kelseebratley/saguaro/Data/wPreviousTreatedANDBufferRemoved/"
 
 # List of file names
-files <- c("2016_variables.shp", "2017_variables.shp", "2018_variables.shp", 
-           "2019_variables.shp", "2021_variables.shp", "2022_variables.shp")
+files <- c("2022_variables.shp", "2021_variables.shp", "2019_variables.shp", "2018_variables.shp", "2017_variables.shp", "2016_variables.shp")
 
 ## PART 1 ##
 # Loop over files to run matching for each dataset
@@ -51,6 +48,40 @@ for (file in files) {
     d <- d[!na_indices,]
   }
 
+  # # Treated vs Not
+  # ggplot(d) +
+  #   geom_point(aes(x=longitude,y=latitude,color=treated), alpha=0.5, size=0.25) +
+  #   coord_fixed() 
+  # 
+  # # Plot Greenness Difference
+  # ggplot(d) +
+  #   geom_point(aes(x=longitude,y=latitude,color=greennessC), alpha=0.5, size=0.25) +
+  #   scale_color_gradient(low='white',high='forestgreen') +
+  #   coord_fixed() +
+  #   ggtitle('Greenness Change')
+  # 
+  # # Plot Slope
+  # ggplot(d) +
+  #   geom_point(aes(x=longitude,y=latitude,color=slope), alpha=0.5, size=0.25) +
+  #   scale_color_gradient(low='white',high='black') +
+  #   coord_fixed() +
+  #   ggtitle('Slope')
+  # 
+  # # Plot Elevation
+  # ggplot(d) +
+  #   geom_point(aes(x=longitude,y=latitude,color=elevation), alpha=0.5, size=0.25) +
+  #   scale_color_gradient(low='white',high='black') +
+  #   coord_fixed() +
+  #   ggtitle('Elevation')
+  # 
+  # # Plot aspect
+  # ggplot(d) +
+  #   geom_point(aes(x=longitude,y=latitude,color=aspect), alpha=0.5, size=0.25) +
+  #   scale_color_gradient(low='white',high='black') +
+  #   coord_fixed() +
+  #   ggtitle('Aspect')
+
+  
   # Matching
   d.tr <- d[d$cat=='treated',]
   d.ct <- d[d$cat=='untreated',]
@@ -64,12 +95,8 @@ for (file in files) {
   m <- Match(d.in$preSprayGr, d.in$tr, d.in[,cov], caliper=0.5, replace = FALSE)
 
   # Print summary of the matching
-  matching_summary <- summary(m)
-  print(matching_summary)
-  
-  # Add the matching summary to the list
-  matching_summaries[[file]] <- matching_summary
-  
+  print(summary(m))
+
   # Retrieving matched dataset
   d.m <- rbind(d.in[m$index.treated,],d.in[m$index.control,])
 
@@ -142,11 +169,8 @@ plot_matched_units <- function(dataset, year) {
   # Save plot
   plot_file_name <- paste0("Results/matched_plots/", year, "_matched_units_plot.png")
   ggsave(plot_file_name, plot, width = 8, height = 6, units = "in", dpi = 300)
-
-  # Print the saved file name
   print(paste("Saved plot:", plot_file_name))
   
-  # Return the plot (optional)
   return(plot)
 }
 
