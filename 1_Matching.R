@@ -1,183 +1,113 @@
+library(sf)
+library(stringr)
+library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(Matching)
-library(dplyr)
-library(sf)
 
-# # Setting up the environment and calling files
-# wf <- function(x) paste('https://raw.githubusercontent.com/kbratley/saguaro/main/', x, sep='')
-# 
-# # List of file names
-# files <- c("Data/wPreviousTreatedANDBufferRemoved/2016_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2017_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2018_variables.shp",
-#            "Data/wPreviousTreatedANDBufferRemoved/2019_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2021_variables.shp", "Data/wPreviousTreatedANDBufferRemoved/2022_variables.shp")
+# Define folder and file names
+local_folder <- "/usr4/ge501/kbratley/saguaro/Data/wPreviousTreatedANDBufferRemoved"
+files <- c("2022_variables.shp", "2021_variables.shp", "2019_variables.shp", 
+           "2018_variables.shp", "2017_variables.shp", "2016_variables.shp")
 
-# ## PART 1 ##
-# # Loop over files to run matching for each dataset
-# for (file in files) {
-#   # Load data
-#   file_url <- wf(file)
-#   d <- st_read(file_url)
-# }
+# Organize Data
+datasets <- list()
 
-
-# Set the local path to your folder
-local_folder <- "/users/kelseebratley/saguaro/Data/wPreviousTreatedANDBufferRemoved/"
-
-# List of file names
-files <- c("2022_variables.shp", "2021_variables.shp", "2019_variables.shp", "2018_variables.shp", "2017_variables.shp", "2016_variables.shp")
-
-## PART 1 ##
-# Loop over files to run matching for each dataset
-for (file in files) {
-  # Construct the local file path
-  file_path <- file.path(local_folder, file)
-  # Load data
-  d <- st_read(file_path)
+# Read and process each file
+for (i in 1:length(files)) {
+  print(paste("Reading file:", files[i]))
+  combined_data <- st_read(file.path(local_folder, files[i]))
   
-  # Visualizing treated vs. untreated
-  d$cat <- ifelse(d$treated==0, 'untreated',
-                  ifelse(d$treated==1, 'treated', NA))
-
-  # boolean indexing:
-  # d <- d[!is.na(d$cat),]
-  # table(d$cat)  # counts pixels for each group
-  na_indices <- is.na(d$cat)
-
-  # Subset the data frame only if there are no NA values
-  if (any(na_indices)) {
-    d <- d[!na_indices,]
-  }
-
-  # # Treated vs Not
-  # ggplot(d) +
-  #   geom_point(aes(x=longitude,y=latitude,color=treated), alpha=0.5, size=0.25) +
-  #   coord_fixed() 
-  # 
-  # # Plot Greenness Difference
-  # ggplot(d) +
-  #   geom_point(aes(x=longitude,y=latitude,color=greennessC), alpha=0.5, size=0.25) +
-  #   scale_color_gradient(low='white',high='forestgreen') +
-  #   coord_fixed() +
-  #   ggtitle('Greenness Change')
-  # 
-  # # Plot Slope
-  # ggplot(d) +
-  #   geom_point(aes(x=longitude,y=latitude,color=slope), alpha=0.5, size=0.25) +
-  #   scale_color_gradient(low='white',high='black') +
-  #   coord_fixed() +
-  #   ggtitle('Slope')
-  # 
-  # # Plot Elevation
-  # ggplot(d) +
-  #   geom_point(aes(x=longitude,y=latitude,color=elevation), alpha=0.5, size=0.25) +
-  #   scale_color_gradient(low='white',high='black') +
-  #   coord_fixed() +
-  #   ggtitle('Elevation')
-  # 
-  # # Plot aspect
-  # ggplot(d) +
-  #   geom_point(aes(x=longitude,y=latitude,color=aspect), alpha=0.5, size=0.25) +
-  #   scale_color_gradient(low='white',high='black') +
-  #   coord_fixed() +
-  #   ggtitle('Aspect')
-
+  # Add a column for the year, extracted from the file name
+  combined_data$Year <- as.numeric(str_extract(files[i], "\\d+"))
   
-  # Matching
-  d.tr <- d[d$cat=='treated',]
-  d.ct <- d[d$cat=='untreated',]
-  d.tr$tr <- 1
-  d.ct$tr <- 0
-  d.in <- rbind(d.tr, d.ct)
-  # Remove the geometry column
-  d.in <- sf::st_set_geometry(d.in, NULL)
-
-  cov <- c('elevation','slope','aspect')
-  m <- Match(d.in$preSprayGr, d.in$tr, d.in[,cov], caliper=0.5, replace = FALSE)
-
-  # Print summary of the matching
-  print(summary(m))
-
-  # Retrieving matched dataset
-  d.m <- rbind(d.in[m$index.treated,],d.in[m$index.control,])
-
-  # Creating a new categorical treatment variable for mapping
-  d.m$group <- ifelse(d.m$tr, 'treatment units', 'matched controls')
-
-  # Exporting 'm' variable for each year
-  if (!file.exists("Results")) {
-    dir.create("Results")
-  }
-  year_label <- str_extract(file, "\\d{4}")
-  export_file_name <- paste0("Results/matching_results_", year_label, ".shp")
-  st_write(st_as_sf(d.m, coords = c("longitude", "latitude")), export_file_name)
-
-  # Exporting dataset to environment
-  assign(paste0("dataset_", year_label), d.m)
+  # Store data in the list
+  datasets[[i]] <- combined_data
+  cat("Processed file", i, "of", length(files), "\n")
 }
 
-## PART 2 ##
-# Aggregate matched results to serve as a 'mask' for filtering panel model data
-dataset_variables <- c("treated", "group", "latitude", "longitude", ".geo")
+# Combine all datasets into a single data frame
+combined_data <- do.call(rbind, datasets)
 
-# Initialize the final combined dataset
-final_dataset <- NULL
+# Create a unique pixel ID based on lat and lon
+combined_data <- combined_data %>%
+  group_by(latitude, longitude) %>%
+  mutate(Pixel_ID = group_indices())
 
-# Loop over years
-for (year_label in c("2016", "2017", "2018", "2019", "2021", "2022")) {
-  # Load each dataset from the environment
-  dataset <- get(paste0("dataset_", year_label))
+# Filter out rows with less than 6 corresponding rows for each 'Pixel_ID'
+pixel_counts <- combined_data %>%
+  group_by(Pixel_ID) %>%
+  summarise(row_count = n())
 
-  # Select the relevant columns
-  dataset <- dataset[, dataset_variables, drop = FALSE]
+pixels_to_remove <- pixel_counts %>%
+  filter(row_count < 6) %>%
+  pull(Pixel_ID)
 
-  # Combine datasets
-  if (is.null(final_dataset)) {
-    final_dataset <- dataset
-  } else {
-    final_dataset <- bind_rows(final_dataset, dataset)
-  }
+# Ensure that Pixel_ID's are sequential and have no missing #'s
+combined_data <- combined_data %>%
+  arrange(Pixel_ID)
+
+# Calculate the number of groups and create a sequence of numbers repeating every 6 rows
+num_rows <- nrow(combined_data)
+num_groups <- ceiling(num_rows / 6)
+new_id_sequence <- rep(1:num_groups, each = 6)
+new_id_sequence <- rep(new_id_sequence, length.out = num_rows)  # Repeat the sequence to cover all rows
+
+# Add the new_id_sequence as the Pixel_ID column to combined_data
+combined_data$New_ID <- new_id_sequence
+
+##############
+# Matching
+##############
+
+# Visualizing treated vs. untreated
+combined_data$cat <- ifelse(combined_data$treated == 0, 'untreated',
+                            ifelse(combined_data$treated == 1, 'treated', NA))
+
+# Subset the data frame only if there are no NA values
+na_indices <- is.na(combined_data$cat)
+if (any(na_indices)) {
+  combined_data <- combined_data[!na_indices,]
 }
 
-# Group by '.geo' and summarize 'treated' column
-final_dataset <- final_dataset %>%
-  group_by(.geo) %>%
-  summarise(treated = ifelse(any(treated == 1), 0, 1),
-            group = first(group),
-            latitude = first(latitude),
-            longitude = first(longitude))
+d.tr <- combined_data[combined_data$cat == 'treated',]
+d.ct <- combined_data[combined_data$cat == 'untreated',]
+d.in <- rbind(d.tr, d.ct)
+d.in <- sf::st_set_geometry(d.in, NULL) # Remove the geometry column
 
-# Print the final combined dataset
-head(final_dataset)
+cov <- c('elevation','slope','aspect')
+m <- Match(d.in$preSprayGr, d.in$treated, d.in[,cov], caliper=0.5, replace = FALSE)
+# print(summary(m))
 
-# Save the final combined dataset as CSV
-write.csv(final_dataset, "Results/final_combined_dataset.csv", row.names = FALSE)
+# Retrieving matched dataset
+d.m <- rbind(d.in[m$index.treated,],d.in[m$index.control,])
 
-# Save the final combined dataset as shapefile
-export_file_name <- paste0("Results/final_combined_dataset.shp")
-st_write(st_as_sf(final_dataset, coords = c("longitude", "latitude")), export_file_name)
+# Plot the results
+# Creating a new categorical treatment variable for mapping
+d.m$group <- ifelse(d.m$treated, 'treatment units', 'matched controls')
 
-# Function to save and plot matched units
-plot_matched_units <- function(dataset, year) {
-  # Plot
-  plot <- ggplot(dataset) +
-    geom_point(aes(x = longitude, y = latitude, color = group), alpha = 0.5, size = 0.25) +
-    coord_fixed() +
-    ggtitle(paste(year, "- Matched vs. Treatment Units")) +
-    theme(legend.text = element_text(size = 16)) +
-    theme(legend.title = element_text(size = 16))
-  
-  # Save plot
-  plot_file_name <- paste0("Results/matched_plots/", year, "_matched_units_plot.png")
-  ggsave(plot_file_name, plot, width = 8, height = 6, units = "in", dpi = 300)
-  print(paste("Saved plot:", plot_file_name))
-  
-  return(plot)
+plot <- ggplot(d.m) +
+  geom_point(aes(x = longitude, y = latitude, color = group), alpha = 0.5, size = 0.25) +
+  coord_fixed() +
+  ggtitle("Matched vs. Treatment Units") +
+  theme(legend.text = element_text(size = 16)) +
+  theme(legend.title = element_text(size = 16))
+print(plot)
+
+################
+# Exporting
+################
+# Exporting matched dataset
+if (!file.exists("Results")) {
+  dir.create("Results")
 }
+export_file_name <- "Results/matching_results_combined.shp"
+st_write(st_as_sf(d.m, coords = c("longitude", "latitude")), export_file_name)
 
-plot_matched_units(dataset_2016, "2016")
-plot_matched_units(dataset_2017, "2017")
-plot_matched_units(dataset_2018, "2018")
-plot_matched_units(dataset_2019, "2019")
-plot_matched_units(dataset_2021, "2021")
-plot_matched_units(dataset_2022, "2022")
-plot_matched_units(final_dataset, "All")
+# Exporting dataset to environment
+assign("combined_dataset", d.m)
+
+# Exporting the plot
+plot_file_name <- "Results/matched_units_plot.png"
+ggsave(plot_file_name, plot, width = 10, height = 8, units = "in", dpi = 500)
+print(paste("Saved plot:", plot_file_name))
