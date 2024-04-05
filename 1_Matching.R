@@ -62,11 +62,11 @@ combined_data$Pixel_ID <- new_id_sequence
 
 #NEEDS WORK
 #File is too big to save to github
-# combined_data2 <- combined_data[, c("Pixel_ID", "Year", "treated", 
+# combined_data <- combined_data[, c("Pixel_ID", "Year", "treated", 
 #                              "preSprayGreenness", "postSprayGreenness", 
 #                              "aspect", "elevation", "slope", 
 #                              "latitude", "longitude")]
-# write.csv(combined_data2, file = "Results/combined_data.csv", row.names = FALSE)
+# write.csv(combined_data, file = "Results/combined_data.csv", row.names = FALSE)
 
 ##################
 # Matching
