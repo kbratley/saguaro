@@ -2,40 +2,60 @@ library(sf)
 library(stringr)
 library(dplyr)
 library(ggplot2)
-library(tidyverse)
 library(Matching)
+library(raster)
 
 # Define function to generate URLs
 wf <- function(x) paste('https://raw.github.com/kbratley/saguaro/main/', x, sep='')
 
-# Define folder and file names
-files <- c("Data/wPreviousTreatedANDBufferRemoved/2022_variables.csv", "Data/wPreviousTreatedANDBufferRemoved/2021_variables.csv", 
-           "Data/wPreviousTreatedANDBufferRemoved/2019_variables.csv", "Data/wPreviousTreatedANDBufferRemoved/2018_variables.csv", 
-           "Data/wPreviousTreatedANDBufferRemoved/2017_variables.csv", "Data/wPreviousTreatedANDBufferRemoved/2016_variables.csv")
+# List of file names
+files <- paste0("Data/", c(2016:2019, 2021:2022), "_variables.csv")
+
+# List of mask file names
+mask_files <- paste0("Data/Mask_", c(2016:2019, 2021:2022), ".tif")
 
 ##################
 # Organize Data
 ##################
 
+# # Define a function to plot masked data
+# plot_masked_data <- function(data, year) {
+#   print(ggplot() +
+#           geom_sf(data = data, color = "blue") +
+#           labs(title = paste("Masked Data for Year", year)) +
+#           theme_minimal())
+# }
+
+# Organize Data
 datasets <- list()
 
 # Read and process each file
 for (i in 1:length(files)) {
-  print(paste("Reading file:", files[i]))
-  url <- wf(files[i])
+  url <- wf(files[i]) 
   combined_data <- read.csv(url)
-  combined_data$Year <- as.numeric(str_extract(files[i], "\\d+"))
+  year <- as.numeric(str_extract(files[i], "\\d+"))  # Extract year from filename
+  mask <- raster(mask_files[i])
+  combined_data <- st_as_sf(combined_data, coords = c("longitude", "latitude"), crs = st_crs(mask))  # Convert csv to sf object
+  combined_data$mask_value <- extract(mask, combined_data)  # Extract values from raster to points
+  combined_data <- combined_data[combined_data$mask_value == 1, ]  # Filter out rows where mask doesn't equal 1
+  combined_data$Year <- year  # Add year information
+  
+  # Create a unique pixel ID based on lat and lon
+  combined_data <- combined_data %>%
+    group_by(geometry) %>%
+    mutate(Pixel_ID = cur_group_id())
+  
   datasets[[i]] <- combined_data
+  # plot_masked_data(combined_data, year)
   cat("Processed file", i, "of", length(files), "\n")
 }
 
 # Combine all datasets into a single data frame
 combined_data <- do.call(rbind, datasets)
 
-# Create a unique pixel ID based on lat and lon
+# Sort by Pixel_ID in ascending order
 combined_data <- combined_data %>%
-  group_by(latitude, longitude) %>%
-  mutate(Pixel_ID = cur_group_id())
+  arrange(Pixel_ID)
 
 # Filter out rows with less than 6 corresponding rows for each 'Pixel_ID'
 pixel_counts <- combined_data %>%
@@ -50,7 +70,6 @@ combined_data <- combined_data %>%
   arrange(Pixel_ID)
 
 # Ensure that Pixel_ID is sequential and has no missing #'s
-# (Kind of a backwards way to do this- but computationally easy)
 num_rows <- nrow(combined_data)
 num_groups <- ceiling(num_rows / 6) #calculate # of groups
 new_id_sequence <- rep(1:num_groups, each = 6) #create sequence of #'s repeating every 6 rows
@@ -60,13 +79,10 @@ new_id_sequence <- rep(new_id_sequence, length.out = num_rows)  # Repeat the seq
 combined_data <- combined_data[, !names(combined_data) %in% "Pixel_ID"]
 combined_data$Pixel_ID <- new_id_sequence
 
-#NEEDS WORK
-#File is too big to save to github
-# combined_data <- combined_data[, c("Pixel_ID", "Year", "treated", 
-#                              "preSprayGreenness", "postSprayGreenness", 
-#                              "aspect", "elevation", "slope", 
-#                              "latitude", "longitude")]
-# write.csv(combined_data, file = "Results/combined_data.csv", row.names = FALSE)
+# Extract longitude and latitude from geometry column
+combined_sf <- st_as_sf(combined_data, wkt = "geometry")
+combined_data$longitude <- st_coordinates(combined_sf)[, 1]
+combined_data$latitude <- st_coordinates(combined_sf)[, 2]
 
 ##################
 # Matching
@@ -85,10 +101,18 @@ if (any(na_indices)) {
 d.tr <- combined_data[combined_data$cat == 'treated',]
 d.ct <- combined_data[combined_data$cat == 'untreated',]
 d.in <- rbind(d.tr, d.ct)
-# d.in <- sf::st_set_geometry(d.in, NULL) # Remove the geometry column
 
-cov <- c('elevation','slope','aspect')
-m <- Match(d.in$preSprayGr, d.in$treated, d.in[,cov], caliper=0.5, replace = FALSE)
+# Convert elevation column to numeric
+d.in$elevation <- as.numeric(d.in$elevation)
+
+cov <- c('elevation','slope','aspect','precipitation_sum')
+
+# Extract necessary columns as a data frame
+matching_data <- d.in[, c("preSprayGreenness", "treated", cov)]
+matching_data <- sf::st_set_geometry(matching_data, NULL) # Remove the geometry column
+
+# Perform matching
+m <- Match(matching_data$preSprayGreenness, matching_data$treated, as.matrix(matching_data[, cov]), caliper = 0.5, replace = FALSE)
 # print(summary(m))
 
 # Retrieving matched dataset
@@ -98,6 +122,7 @@ d.m <- rbind(d.in[m$index.treated,],d.in[m$index.control,])
 # Creating a new categorical treatment variable for mapping
 d.m$group <- ifelse(d.m$treated, 'treatment units', 'matched controls')
 
+# Create the plot
 plot <- ggplot(d.m) +
   geom_point(aes(x = longitude, y = latitude, color = group), alpha = 0.5, size = 0.25) +
   coord_fixed() +
@@ -109,10 +134,7 @@ print(plot)
 ##################
 # Exporting
 ##################
-# Exporting matched dataset
-if (!file.exists("Results")) {
-  dir.create("Results")
-}
+d.m <- ungroup(d.m)
 st_write(st_as_sf(d.m, coords = c("longitude", "latitude")), "Results/matching_results.shp")
 write.csv(d.m, file = "Results/matching_results.csv", row.names = FALSE)
 
