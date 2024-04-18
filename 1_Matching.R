@@ -18,13 +18,22 @@ mask_files <- paste0("Data/Mask_", c(2016:2019, 2021:2022), ".tif")
 # Organize Data
 ##################
 
-# # Define a function to plot masked data
-# plot_masked_data <- function(data, year) {
-#   print(ggplot() +
-#           geom_sf(data = data, color = "blue") +
-#           labs(title = paste("Masked Data for Year", year)) +
-#           theme_minimal())
-# }
+# Define a function to plot masked data with custom color
+plot_masked_data <- function(data, year, color_column) {
+  print(ggplot() +
+          geom_sf(data = data, aes_string(color = color_column)) +  # Map 'color' aesthetic to specified column
+          labs(title = paste("Masked Data for Year", year)) +
+          theme_minimal())
+}
+
+# Define a function to plot masked data with custom color
+plot_masked_data_preSprayGreenness <- function(data, year, color_column) {
+  print(ggplot() +
+          geom_sf(data = data, aes_string(color = color_column), size = 0.25) +  # Map 'color' aesthetic to specified column
+          scale_color_gradient(low = "lightgreen", high = "darkgreen") +  # Gradient scale from light to dark green
+          labs(title = paste("Pre-Spray Greenness for Year", year)) +
+          theme_minimal())
+}
 
 # Organize Data
 datasets <- list()
@@ -36,8 +45,12 @@ for (i in 1:length(files)) {
   year <- as.numeric(str_extract(files[i], "\\d+"))  # Extract year from filename
   mask <- raster(mask_files[i])
   combined_data <- st_as_sf(combined_data, coords = c("longitude", "latitude"), crs = st_crs(mask))  # Convert csv to sf object
-  combined_data$mask_value <- extract(mask, combined_data)  # Extract values from raster to points
-  combined_data <- combined_data[combined_data$mask_value == 1, ]  # Filter out rows where mask doesn't equal 1
+  
+  # Extract values from raster to points
+  mask_values <- raster::extract(mask, as.matrix(st_coordinates(combined_data)))
+  combined_data$mask_value <- mask_values  # Assign the extracted values
+  
+  combined_data <- combined_data[!is.na(mask_values) & mask_values == 1, ]  # Filter out rows where mask doesn't equal 1
   combined_data$Year <- year  # Add year information
   
   # Create a unique pixel ID based on lat and lon
@@ -46,7 +59,13 @@ for (i in 1:length(files)) {
     mutate(Pixel_ID = cur_group_id())
   
   datasets[[i]] <- combined_data
-  # plot_masked_data(combined_data, year)
+  # plot_masked_data(combined_data, year, "treated")
+  # plot_masked_data(combined_data, year, "slope")
+  # plot_masked_data(combined_data, year, "elevation")
+  # plot_masked_data(combined_data, year, "aspect")
+  # plot_masked_data(combined_data, year, "precipitation_sum")
+  # plot_masked_data_preSprayGreenness(combined_data, year, "preSprayGreenness")
+  
   cat("Processed file", i, "of", length(files), "\n")
 }
 
@@ -131,12 +150,40 @@ plot <- ggplot(d.m) +
   theme(legend.title = element_text(size = 16))
 print(plot)
 
+################################################################
+# Matching Balance: Plotting covariate means before and after
+################################################################
+
+# Define a function to generate the plot
+plot_density_with_mean <- function(data, x_var, cat_var, title) {
+  d_means <- data %>%
+    group_by({{cat_var}}) %>%
+    summarize(cat_mean = mean({{x_var}}))
+  
+  ggplot(data) +
+    geom_density(aes_string(x=x_var, color=cat_var)) +
+    geom_vline(data=d_means, aes_string(xintercept="cat_mean", color=cat_var), linetype='dashed') +
+    ggtitle(title)
+}
+
+# BEFORE
+# plot_density_with_mean(combined_data, "elevation", "cat", 'Before Covariate Distribution - Elevation')
+# plot_density_with_mean(combined_data, "slope", "cat", 'Before Covariate Distribution - Slope')
+# plot_density_with_mean(combined_data, "aspect", "cat", 'Before Covariate Distribution - Aspect')
+# plot_density_with_mean(combined_data, "preSprayGreenness", "cat", 'Before Covariate Distribution - Pre-Spray Max Greenness')
+
+# AFTER
+plot_density_with_mean(d.m, "elevation", "cat", 'After Covariate Distribution - Elevation')
+plot_density_with_mean(d.m, "slope", "cat", 'After Covariate Distribution - Slope')
+plot_density_with_mean(d.m, "aspect", "cat", 'After Covariate Distribution - Aspect')
+plot_density_with_mean(d.m, "preSprayGreenness", "cat", 'After Covariate Distribution - Pre-Spray Max Greenness')
+
 ##################
 # Exporting
 ##################
 d.m <- ungroup(d.m)
-st_write(st_as_sf(d.m, coords = c("longitude", "latitude")), "Results/matching_results.shp")
 write.csv(d.m, file = "Results/matching_results.csv", row.names = FALSE)
+st_write(st_as_sf(d.m, coords = c("longitude", "latitude")), "Results/matching_results.shp")
 
 # Exporting dataset to environment
 assign("combined_dataset", d.m)
