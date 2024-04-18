@@ -135,9 +135,12 @@ did <- feols(greenness ~ treated + post_treatment + ATT + Year2017 + Year2018 + 
 msummary(did, stars = c('*' = .1, '**' = .01, '***' = .001))
 
 # Adding in spatial lag to test how the treatment status in the previous year impacts the treatment effect on greenness in subsequent years
-did <- feols(greenness ~ treated_prev1Y + post_treatment + ATT_prev1Y + Year2018 + Year2019 + Year2022 +
-                ATT_prev1Y:Year2018 + ATT_prev1Y:Year2019 +  ATT_prev1Y:Year2022 |
-               aspect + slope + elevation,
-             data = panel_data,
-             cluster = ~Pixel_ID)
+did <- feols(greenness ~ treated + post_treatment + ATT + Year2017 + Year2018 + Year2019 + Year2021 + Year2022 +
+                 ATT:Year2017 + ATT:Year2018 + ATT:Year2019 + ATT:Year2021 + ATT:Year2022 
+                 + treated_prev1Y 
+                 # + ATT_prev1Y 
+                 # + ATT_prev1Y:Year2018 + ATT_prev1Y:Year2019 +  ATT_prev1Y:Year2022 
+                 |aspect + slope + elevation,
+                 data = panel_data,
+                cluster = ~Pixel_ID)
 msummary(did, stars = c('*' = .1, '**' = .01, '***' = .001))
