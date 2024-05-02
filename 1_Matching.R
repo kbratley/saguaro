@@ -59,7 +59,7 @@ for (i in 1:length(files)) {
     mutate(Pixel_ID = cur_group_id())
   
   datasets[[i]] <- combined_data
-  # plot_masked_data(combined_data, year, "treated")
+  plot_masked_data(combined_data, year, "treated")
   # plot_masked_data(combined_data, year, "slope")
   # plot_masked_data(combined_data, year, "elevation")
   # plot_masked_data(combined_data, year, "aspect")
@@ -172,11 +172,11 @@ plot_density_with_mean <- function(data, x_var, cat_var, title) {
 # plot_density_with_mean(combined_data, "aspect", "cat", 'Before Covariate Distribution - Aspect')
 # plot_density_with_mean(combined_data, "preSprayGreenness", "cat", 'Before Covariate Distribution - Pre-Spray Max Greenness')
 
-# AFTER
-plot_density_with_mean(d.m, "elevation", "cat", 'After Covariate Distribution - Elevation')
-plot_density_with_mean(d.m, "slope", "cat", 'After Covariate Distribution - Slope')
-plot_density_with_mean(d.m, "aspect", "cat", 'After Covariate Distribution - Aspect')
-plot_density_with_mean(d.m, "preSprayGreenness", "cat", 'After Covariate Distribution - Pre-Spray Max Greenness')
+# # AFTER
+# plot_density_with_mean(d.m, "elevation", "cat", 'After Covariate Distribution - Elevation')
+# plot_density_with_mean(d.m, "slope", "cat", 'After Covariate Distribution - Slope')
+# plot_density_with_mean(d.m, "aspect", "cat", 'After Covariate Distribution - Aspect')
+# plot_density_with_mean(d.m, "preSprayGreenness", "cat", 'After Covariate Distribution - Pre-Spray Max Greenness')
 
 ##################
 # Exporting
